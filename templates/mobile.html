@@ -1,0 +1,167 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Visual Aid — Mobile Streamer</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: #071126;
+      color: #dfefff;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    video {
+      width: 100%;
+      height: auto;
+      flex: 1;
+      background: #000;
+    }
+    header {
+      padding: 8px;
+      background: #0b1220;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    footer {
+      padding: 8px;
+      text-align: center;
+    }
+    .pill {
+      padding: 6px 10px;
+      background: #021024;
+      border-radius: 999px;
+      font-size: 12px;
+    }
+    button {
+      background: #1a66ff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #0d4de1;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <label>Room: <input id="room" value="demo" /></label>
+    <button id="connect">Connect</button>
+    <button id="stop" disabled>Stop</button>
+    <label class="pill">
+      <input type="checkbox" id="speak" checked /> Speak (English)
+    </label>
+  </header>
+
+  <video id="v" autoplay playsinline muted></video>
+  <canvas id="c" style="display:none"></canvas>
+
+  <footer>
+    <small>
+      Open this page on your phone via <strong>HTTPS</strong> (localtunnel)
+      for camera access. Use the same room as the dashboard.
+    </small>
+  </footer>
+  <script>
+  const video = document.getElementById('v');
+  const canvas = document.getElementById('c');
+  const roomInput = document.getElementById('room');
+  const connectBtn = document.getElementById('connect');
+  const stopBtn = document.getElementById('stop');
+  const speakChk = document.getElementById('speak');
+
+  let ws = null;
+  let stream = null;
+  let running = false;
+  let sendInterval = null;
+
+  function speak(text){
+    try{
+      if(!speakChk.checked) return;
+      const ut = new SpeechSynthesisUtterance(text || '');
+      ut.rate = 1.0;
+      ut.lang = 'en-US';
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(ut);
+    }catch(e){ console.error(e); }
+  }
+
+  async function startStream(){
+    const room = roomInput.value || 'demo';
+    const host = window.location.hostname;
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const isTunnelHost = host.includes('loca.lt') || host.includes('ngrok') || host.includes('trycloudflare');
+    const wsUrl = isTunnelHost ? `${proto}://${host}/ws/${room}` : `${proto}://${host}:${location.port || 8000}/ws/${room}`;
+
+    console.log("Connecting to WebSocket:", wsUrl);
+    ws = new WebSocket(wsUrl);
+
+    ws.onopen = ()=>{ console.log('✅ WebSocket connected'); };
+    ws.onmessage = (evt)=>{
+      try{
+        const js = JSON.parse(evt.data);
+        if(js.type === 'detection'){
+          const p = js.payload;
+          speak(p.summary || '');
+          console.log('Detection:', p);
+        }
+      }catch(e){ console.warn('Parse error', e); }
+    };
+    ws.onclose = ()=>{ console.log('❌ WebSocket closed'); };
+
+    try{
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 640 } },
+        audio: false
+      });
+      video.srcObject = stream;
+      await video.play();
+    }catch(e){
+      alert('Camera failed: ' + e.message + '\nUse HTTPS and allow permissions.');
+      return;
+    }
+
+    running = true;
+    connectBtn.disabled = true; stopBtn.disabled = false;
+
+    const ctx = canvas.getContext('2d');
+    canvas.width = 320; canvas.height = 240;
+    sendInterval = setInterval(()=>{
+      if(!running || video.readyState < 2) return;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(blob=>{
+        const reader = new FileReader();
+        reader.onloadend = ()=>{
+          const b64 = reader.result;
+          const msg = JSON.stringify({ type: 'frame', b64 });
+          if(ws && ws.readyState === WebSocket.OPEN) ws.send(msg);
+        };
+        reader.readAsDataURL(blob);
+      }, 'image/jpeg', 0.6);
+    }, 500);
+  }
+
+  function stopStream(){
+    running = false;
+    if(sendInterval) clearInterval(sendInterval);
+    if(ws) ws.close();
+    if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null }
+    connectBtn.disabled = false; stopBtn.disabled = true;
+  }
+
+  connectBtn.addEventListener('click', startStream);
+  stopBtn.addEventListener('click', stopStream);
+</script>
+
+</body>
+</html>

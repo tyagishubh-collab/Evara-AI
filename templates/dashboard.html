@@ -1,0 +1,124 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Visual Aid — Dashboard</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #071126;
+      color: #dfefff;
+      padding: 12px;
+    }
+    #log {
+      white-space: pre-wrap;
+      background: #021024;
+      padding: 8px;
+      border-radius: 6px;
+      height: 300px;
+      overflow: auto;
+    }
+    .row {
+      margin: 8px 0;
+    }
+    button {
+      background: #1a66ff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 14px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: 0.2s;
+    }
+    button:hover {
+      background: #0e47b8;
+    }
+    input[type="text"], input[type="checkbox"] {
+      margin-left: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Visual Aid — Dashboard</h2>
+  <div class="row">
+    <label>Room:
+      <input id="room" type="text" value="demo" />
+    </label>
+    <button id="connect">Connect</button>
+    <label style="margin-left:10px;">
+      <input type="checkbox" id="speak" checked /> Speak (English)
+    </label>
+  </div>
+
+  <div id="summary"
+       style="margin-top:8px;background:#0b1220;padding:8px;border-radius:6px;">
+    No data yet.
+  </div>
+
+  <div id="log"></div>
+
+  <script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const roomInput = document.getElementById('room');
+    const connectBtn = document.getElementById('connect');
+    const log = document.getElementById('log');
+    const summary = document.getElementById('summary');
+    const speakChk = document.getElementById('speak');
+    let ws = null;
+
+    function addLog(s) {
+      log.innerText = s + '\n' + log.innerText;
+    }
+
+    function speak(text) {
+      try {
+        if (!speakChk.checked) return;
+        const ut = new SpeechSynthesisUtterance(text || '');
+        ut.rate = 1.0;
+        ut.lang = 'en-US';
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(ut);
+      } catch (e) {
+        console.error("Speech synthesis error:", e);
+      }
+    }
+
+    connectBtn.addEventListener('click', () => {
+      const room = roomInput.value || 'demo';
+
+      // ✅ Universal WebSocket URL (works with localhost, Cloudflare, ngrok, LocalTunnel)
+      const origin = window.location.origin.replace(/^http/, "ws");
+      const wsUrl = `${origin}/ws/${room}`;
+
+      console.log("Connecting to WebSocket:", wsUrl);
+      addLog("Attempting connection: " + wsUrl);
+
+      try { if (ws && ws.readyState !== WebSocket.CLOSED) ws.close(); } catch (e) {}
+
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => addLog('✅ Connected to room ' + room);
+
+      ws.onmessage = (evt) => {
+        try {
+          const js = JSON.parse(evt.data);
+          if (js.type === 'detection') {
+            const p = js.payload;
+            addLog(JSON.stringify(p, null, 2));
+            summary.innerText = p.summary || 'No summary';
+            speak(p.summary || '');
+          }
+        } catch (e) {
+          console.warn('Parse error:', e);
+        }
+      };
+
+      ws.onclose = () => addLog('❌ Disconnected');
+      ws.onerror = (e) => console.error("WebSocket error:", e);
+    });
+  });
+  </script>
+</body>
+</html>
