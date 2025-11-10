@@ -108,3 +108,38 @@ webencodings==0.5.1
 websocket-client==1.8.0
 wsproto==1.2.0
 zipp==3.23.0
+
+# ========== Pathfinder Core Dependencies ==========
+# Vision & AI
+ultralytics>=8.0.0
+torch>=2.0.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+python-dotenv>=1.0.0
+
+# TTS/STT (Optional - for voice features)
+pyttsx3>=2.90
+vosk>=0.3.45
+sounddevice>=0.4.6
+
+# Web framework (existing VisualAid server)
+fastapi>=0.104.0
+uvicorn>=0.24.0
+websockets>=12.0
+
+# Optional: Gemini API for enhanced narration
+google-generativeai>=0.3.0
+
+# Raspberry Pi Sensors (Optional - only for hardware deployment)
+# RPi.GPIO>=0.7.1
+# smbus>=1.1.post2
+# pyserial>=3.5
+
+# Optional: BLE for ESP32 haptics
+# bleak>=0.21.0
+
+# Optional: Depth estimation
+# depthai>=2.23.0  # For OAK-D camera
+
+# Development tools
+pre-commit>=3.5.0

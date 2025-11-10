@@ -27,7 +27,7 @@ except Exception:
     YOLO = None
 
 # --- Gemini (google-generativeai) ---
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')  # ✅ FIXED: Use env var name, not the key itself
 USE_GEMINI = bool(GEMINI_API_KEY)
 model_gemini = None
 
