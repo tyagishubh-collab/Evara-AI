@@ -3,7 +3,7 @@ from typing import Optional, Tuple
 
 from sensors.gps import GPS
 from config import (
-    TWILIO_SID, TWILIO_AUTH, TWILIO_FROM,
+    TWILIO_SID, TWILIO_AUTH, TWILIO_FROM, TWILIO_WHATSAPP_FROM,
     EMERGENCY_CONTACT, EMERGENCY_CONTACT_WHATSAPP,
     EMERGENCY_EMAIL, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS,
 )
@@ -22,13 +22,36 @@ def _maps_link(lat: float, lon: float) -> str:
     return f"https://maps.google.com/?q={lat},{lon}"
 
 
+def _normalize_e164(number: str | None) -> str | None:
+    if not number:
+        return None
+    n = number.strip()
+    # Fix accidental double '+'
+    while n.startswith('++'):
+        n = n[1:]
+    if not n.startswith('+'):
+        n = '+' + n
+    return n
+
+
+def _normalize_whatsapp(from_number: str | None) -> str | None:
+    if not from_number:
+        return None
+    n = from_number.strip()
+    if not n.startswith('whatsapp:'):
+        n = 'whatsapp:' + _normalize_e164(n)
+    return n
+
+
 def _send_twilio_sms(msg: str) -> bool:
     if not (TWILIO_SID and TWILIO_AUTH and TWILIO_FROM and EMERGENCY_CONTACT):
         return False
     try:
         from twilio.rest import Client
         client = Client(TWILIO_SID, TWILIO_AUTH)
-        client.messages.create(body=msg, from_=TWILIO_FROM, to=EMERGENCY_CONTACT)
+        from_num = _normalize_e164(TWILIO_FROM)
+        to_num = _normalize_e164(EMERGENCY_CONTACT)
+        client.messages.create(body=msg, from_=from_num, to=to_num)
         return True
     except Exception as e:
         print(f"⚠️ Twilio SMS error: {e}")
@@ -36,12 +59,17 @@ def _send_twilio_sms(msg: str) -> bool:
 
 
 def _send_twilio_whatsapp(msg: str) -> bool:
-    if not (TWILIO_SID and TWILIO_AUTH and TWILIO_FROM and EMERGENCY_CONTACT_WHATSAPP):
+    # Use explicit WA sender if provided; else derive from TWILIO_FROM
+    from_wa = TWILIO_WHATSAPP_FROM or _normalize_whatsapp(TWILIO_FROM)
+    if not (TWILIO_SID and TWILIO_AUTH and from_wa and EMERGENCY_CONTACT_WHATSAPP):
         return False
     try:
         from twilio.rest import Client
         client = Client(TWILIO_SID, TWILIO_AUTH)
-        client.messages.create(body=msg, from_=f"whatsapp:{TWILIO_FROM}", to=EMERGENCY_CONTACT_WHATSAPP)
+        to_wa = EMERGENCY_CONTACT_WHATSAPP
+        if not to_wa.startswith('whatsapp:'):
+            to_wa = 'whatsapp:' + _normalize_e164(to_wa)
+        client.messages.create(body=msg, from_=from_wa, to=to_wa)
         return True
     except Exception as e:
         print(f"⚠️ Twilio WhatsApp error: {e}")

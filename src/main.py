@@ -21,6 +21,7 @@ try:
     from i_o.haptics import Haptics
     from i_o.sos import SOS
     from i_o.stt import CommandRecognizer
+    from i_o.narration import generate_sync as narr_sync
 except ImportError:
     # Fallback for direct execution
     import os
@@ -38,6 +39,8 @@ except ImportError:
     )
     from i_o.haptics import Haptics
     from i_o.sos import SOS
+    from i_o.stt import CommandRecognizer
+    from i_o.narration import generate_sync as narr_sync
 
 def describe(occ):
     """Generate description of occupancy state."""
@@ -153,9 +156,11 @@ def run():
                 sector = "left" if cx < width/3 else ("right" if cx > 2*width/3 else "ahead")
                 key = (top.get("label", "object"), sector)
                 if key != last_obj_key or (now - last_obj_spoken) > 1.5:
-                    msg = f"{key[0]} {sector}"
-                    if dist:
-                        msg += f", {dist:.1f} meters"
+                    # Build narration context for Gemini (optional)
+                    ctx = {"label": key[0], "sector": sector, "distance_m": dist, "obstacle": True}
+                    msg = narr_sync(ctx) or (
+                        f"{key[0]} {sector}" + (f", {dist:.1f} meters" if dist else "")
+                    )
                     if not tts_muted:
                         speak_async(msg, dedupe_window_s=0.8)
                     last_obj_key = key
@@ -163,9 +168,10 @@ def run():
                     last_spoken = now  # also update generic timer to avoid double speak
             elif now - last_spoken > 1.2:
                 # Fallback to generic occupancy summary
-                msg = f"{'Obstacle ' if any(fused) else ''}{describe(fused)}"
-                if dist:
-                    msg += f", {dist:.1f} meters"
+                ctx = {"label": "", "sector": "ahead", "distance_m": dist, "obstacle": any(fused)}
+                msg = narr_sync(ctx) or (
+                    f"{'Obstacle ' if any(fused) else ''}{describe(fused)}" + (f", {dist:.1f} meters" if dist else "")
+                )
                 if not tts_muted:
                     speak_async(msg, dedupe_window_s=1.0)
                 last_spoken = now

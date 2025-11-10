@@ -36,6 +36,8 @@ USE_GEMINI = bool(GEMINI_API_KEY)
 TWILIO_SID = os.getenv("TWILIO_SID")
 TWILIO_AUTH = os.getenv("TWILIO_AUTH")
 TWILIO_FROM = os.getenv("TWILIO_FROM")
+# Optional: a WhatsApp-enabled Twilio from number like 'whatsapp:+14155238886' (sandbox) or 'whatsapp:+1XXXXXXXXXX'
+TWILIO_WHATSAPP_FROM = os.getenv("TWILIO_WHATSAPP_FROM")
 EMERGENCY_CONTACT = os.getenv("EMERGENCY_CONTACT")  # E.164 phone, e.g., +91XXXXXXXXXX
 EMERGENCY_CONTACT_WHATSAPP = os.getenv("EMERGENCY_CONTACT_WHATSAPP")  # e.g., whatsapp:+91XXXXXXXXXX
 EMERGENCY_EMAIL = os.getenv("EMERGENCY_EMAIL")
